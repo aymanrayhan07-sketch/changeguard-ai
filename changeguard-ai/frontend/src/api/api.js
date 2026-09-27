@@ -10,7 +10,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const BASE_URL = '/api'
+// Configure API base URL: uses VITE_API_URL in production if set, falling back to /api for local dev proxy
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const BASE_URL = rawApiUrl ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`) : '/api'
 
 /**
  * Send a change description to the backend and receive a full analysis report.
