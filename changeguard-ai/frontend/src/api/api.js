@@ -10,8 +10,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// Configure API base URL: uses VITE_API_URL in production if set, falling back to /api for local dev proxy
-const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+// Default production backend on Render
+const DEFAULT_PROD_API_URL = 'https://changeguard-ai-9zml.onrender.com'
+
+// Configure API base URL: uses VITE_API_URL if set, falling back to Render production backend in prod or /api in dev
+const configuredUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? DEFAULT_PROD_API_URL : '')
+const rawApiUrl = configuredUrl.trim().replace(/\/+$/, '')
 const BASE_URL = rawApiUrl ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`) : '/api'
 
 /**
@@ -27,12 +31,26 @@ export async function analyzeChange(changeDescription) {
     body: JSON.stringify({ changeDescription }),
   })
 
+  const text = await res.text()
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? `Request failed with status ${res.status}`)
+    let errorMsg = `Request failed with status ${res.status}`
+    try {
+      const body = JSON.parse(text)
+      if (body.error) errorMsg = body.error
+    } catch {}
+    throw new Error(errorMsg)
   }
 
-  return res.json()
+  if (!text) {
+    throw new Error('Server returned an empty response. Verify backend is reachable.')
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch (_e) {
+    throw new Error(`Unexpected non-JSON response from server: ${text.slice(0, 100)}`)
+  }
 }
 
 /**
@@ -41,5 +59,6 @@ export async function analyzeChange(changeDescription) {
  */
 export async function checkHealth() {
   const res = await fetch(`${BASE_URL}/health`)
-  return res.json()
+  const text = await res.text()
+  return text ? JSON.parse(text) : {}
 }
